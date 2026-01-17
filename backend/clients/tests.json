@@ -1,0 +1,22 @@
+{
+  "tests": [
+    {
+      "name": "Get all clients",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": [
+        {
+          "id": "number",
+          "full_name": "string",
+          "email": "string",
+          "phone": "string",
+          "status": "string",
+          "total_orders": "number",
+          "total_spent": "string"
+        }
+      ],
+      "bodyMatcher": "partial"
+    }
+  ]
+}

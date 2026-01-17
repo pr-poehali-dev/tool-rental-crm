@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -35,11 +35,26 @@ interface Payment {
   date: Date;
 }
 
+interface Client {
+  id: number;
+  full_name: string;
+  email: string;
+  phone: string;
+  company: string | null;
+  status: 'active' | 'blocked' | 'vip';
+  total_orders: number;
+  total_spent: string;
+}
+
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedDates, setSelectedDates] = useState<Date | undefined>();
-  const [activeTab, setActiveTab] = useState('catalog');
+  const [activeTab, setActiveTab] = useState('clients');
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(true);
+  const [clientSearch, setClientSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const tools: Tool[] = [
     { id: 1, name: 'Перфоратор Bosch GBH 2-28', category: 'Электроинструмент', price: 500, status: 'available', image: '🔨' },
@@ -72,6 +87,22 @@ const Index = () => {
 
   const categories = ['all', ...Array.from(new Set(tools.map(t => t.category)))];
 
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        setClientsLoading(true);
+        const response = await fetch('https://functions.poehali.dev/256235e5-d5e9-4eb7-bd2b-9c63df8f5363');
+        const data = await response.json();
+        setClients(data);
+      } catch (error) {
+        toast.error('Ошибка загрузки клиентов');
+      } finally {
+        setClientsLoading(false);
+      }
+    };
+    fetchClients();
+  }, []);
+
   const handleBooking = (tool: Tool) => {
     if (!selectedDates) {
       toast.error('Выберите даты аренды');
@@ -79,6 +110,14 @@ const Index = () => {
     }
     toast.success(`${tool.name} забронирован!`);
   };
+
+  const filteredClients = clients.filter(client => {
+    const matchesSearch = client.full_name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                          client.email.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                          client.phone.includes(clientSearch);
+    const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-orange-50 to-blue-50">
@@ -105,14 +144,18 @@ const Index = () => {
         </header>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl mx-auto h-14 bg-white/80 backdrop-blur-sm">
+          <TabsList className="grid grid-cols-5 w-full max-w-3xl mx-auto h-14 bg-white/80 backdrop-blur-sm">
+            <TabsTrigger value="clients" className="gap-2 text-base data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-white">
+              <Icon name="Users" size={18} />
+              Клиенты
+            </TabsTrigger>
             <TabsTrigger value="catalog" className="gap-2 text-base data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-white">
               <Icon name="Wrench" size={18} />
               Каталог
             </TabsTrigger>
             <TabsTrigger value="bookings" className="gap-2 text-base data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-white">
               <Icon name="Calendar" size={18} />
-              Мои аренды
+              Аренды
             </TabsTrigger>
             <TabsTrigger value="payments" className="gap-2 text-base data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-white">
               <Icon name="CreditCard" size={18} />
@@ -120,9 +163,132 @@ const Index = () => {
             </TabsTrigger>
             <TabsTrigger value="booking" className="gap-2 text-base data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-accent data-[state=active]:text-white">
               <Icon name="CalendarCheck" size={18} />
-              Бронирование
+              Бронь
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="clients" className="space-y-6">
+            <Card className="border-2 shadow-lg animate-scale-in">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-2xl flex items-center gap-2">
+                    <Icon name="Users" size={24} />
+                    База клиентов
+                  </CardTitle>
+                  <Button className="bg-gradient-to-r from-primary to-accent hover:opacity-90">
+                    <Icon name="UserPlus" size={18} className="mr-2" />
+                    Добавить клиента
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-4 flex-wrap">
+                  <Input
+                    placeholder="Поиск по имени, email, телефону..."
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                    className="flex-1 min-w-[300px] h-12 text-base"
+                  />
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[200px] h-12 text-base">
+                      <SelectValue placeholder="Статус" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все статусы</SelectItem>
+                      <SelectItem value="active">Активные</SelectItem>
+                      <SelectItem value="vip">VIP</SelectItem>
+                      <SelectItem value="blocked">Заблокированные</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {clientsLoading ? (
+              <div className="text-center py-12">
+                <Icon name="Loader" size={48} className="mx-auto text-primary animate-spin mb-3" />
+                <p className="text-muted-foreground">Загрузка клиентов...</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {filteredClients.map((client) => (
+                  <Card key={client.id} className="border-2 shadow-lg hover:shadow-xl transition-all hover:scale-[1.01]">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-4 flex-1">
+                          <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold ${
+                            client.status === 'vip' ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white' :
+                            client.status === 'blocked' ? 'bg-red-100 text-red-600' :
+                            'bg-gradient-to-br from-primary/20 to-accent/20 text-primary'
+                          }`}>
+                            {client.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-xl font-bold">{client.full_name}</h3>
+                              {client.status === 'vip' && (
+                                <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+                                  <Icon name="Crown" size={14} className="mr-1" />
+                                  VIP
+                                </Badge>
+                              )}
+                              {client.status === 'blocked' && (
+                                <Badge className="bg-red-500 text-white">
+                                  <Icon name="Ban" size={14} className="mr-1" />
+                                  Заблокирован
+                                </Badge>
+                              )}
+                              {client.status === 'active' && (
+                                <Badge className="bg-green-500 text-white">Активен</Badge>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Icon name="Mail" size={16} />
+                                <span className="truncate">{client.email}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Icon name="Phone" size={16} />
+                                <span>{client.phone}</span>
+                              </div>
+                              {client.company && (
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <Icon name="Building2" size={16} />
+                                  <span className="truncate">{client.company}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-3">
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Всего заказов</p>
+                            <p className="text-2xl font-bold text-primary">{client.total_orders}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Потрачено</p>
+                            <p className="text-xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                              {parseFloat(client.total_spent).toLocaleString('ru-RU')} ₽
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" className="gap-1">
+                              <Icon name="Eye" size={14} />
+                              Просмотр
+                            </Button>
+                            <Button variant="outline" size="sm" className="gap-1">
+                              <Icon name="Edit" size={14} />
+                              Изменить
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
           <TabsContent value="catalog" className="space-y-6">
             <Card className="border-2 shadow-lg animate-scale-in">
